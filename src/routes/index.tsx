@@ -1,30 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
-import { Loader2, Sprout, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { CheckCircle2, Sprout } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CameraCapture } from "@/components/soil/CameraCapture";
 import { SoilForm } from "@/components/soil/SoilForm";
-import { ReportView } from "@/components/soil/ReportView";
-import { analyzeSoil, computeTrend } from "@/lib/soil/engine";
-import { classifySoilImage } from "@/lib/soil/vision";
-import { deleteReport, loadReports, saveReport } from "@/lib/soil/storage";
 import { langNames, makeT, type Lang } from "@/lib/soil/i18n";
-import type { SoilReport, SoilTestInput } from "@/lib/soil/types";
+import type { SoilTestInput } from "@/lib/soil/types";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Soil Health — AI Nutrient Diagnosis & Crop Advice" },
+      { title: "Soil Health — Data Ingestion Pipeline" },
       {
         name: "description",
-        content:
-          "Photograph your field soil or enter lab readings to get an AI soil health score, nutrient deficiency diagnosis, fertiliser doses and crop recommendations.",
-      },
-      { property: "og:title", content: "Soil Health — AI Nutrient Diagnosis & Crop Advice" },
-      {
-        property: "og:description",
-        content:
-          "AI soil health reports with fertiliser and crop recommendations in English, Hindi and Kannada.",
+        content: "Data ingestion pipeline for capturing soil photographs and test readings.",
       },
     ],
   }),
@@ -47,28 +36,13 @@ function Index() {
   const [lang, setLang] = useState<Lang>("en");
   const t = useMemo(() => makeT(lang), [lang]);
 
-  const [tab, setTab] = useState<"new" | "history">("new");
   const [input, setInput] = useState<SoilTestInput>(DEFAULT_INPUT);
   const [photo, setPhoto] = useState<string | undefined>(undefined);
-  const [busy, setBusy] = useState(false);
-  const [reports, setReports] = useState<SoilReport[]>([]);
-  const [current, setCurrent] = useState<SoilReport | null>(null);
+  const [submitted, setSubmitted] = useState(false);
 
-  useEffect(() => setReports(loadReports()), []);
-
-  const trend = useMemo(() => computeTrend(reports), [reports]);
-
-  const run = async () => {
-    setBusy(true);
-    try {
-      const prediction = photo ? await classifySoilImage(photo) : undefined;
-      const report = analyzeSoil(input, prediction, photo, reports.length + 1);
-      setReports(saveReport(report));
-      setCurrent(report);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    } finally {
-      setBusy(false);
-    }
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitted(true);
   };
 
   return (
@@ -81,7 +55,7 @@ function Index() {
             </span>
             <div>
               <h1 className="text-sm font-bold leading-tight">{t("appName")}</h1>
-              <p className="text-[11px] text-muted-foreground">{t("tagline")}</p>
+              <p className="text-[11px] text-muted-foreground">Milestone 1: Data Ingestion Pipeline</p>
             </div>
           </div>
           <div className="flex gap-1">
@@ -99,90 +73,39 @@ function Index() {
             ))}
           </div>
         </div>
-        <nav className="mx-auto flex max-w-xl gap-2 px-4 pb-2">
-          {(["new", "history"] as const).map((k) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => setTab(k)}
-              className={`flex-1 rounded-md px-3 py-1.5 text-xs font-semibold ${
-                tab === k ? "bg-secondary text-secondary-foreground" : "text-muted-foreground"
-              }`}
-            >
-              {k === "new" ? t("newAnalysis") : `${t("history")} (${reports.length})`}
-            </button>
-          ))}
-        </nav>
       </header>
 
       <main className="mx-auto max-w-xl space-y-5 px-4 py-5">
-        {tab === "new" ? (
-          current ? (
-            <>
-              <ReportView report={current} trend={trend} t={t} />
-              <Button
-                className="w-full"
-                onClick={() => {
-                  setCurrent(null);
-                  setPhoto(undefined);
-                }}
-              >
-                {t("saveAndNew")}
-              </Button>
-            </>
-          ) : (
-            <>
-              <section className="rounded-xl border border-border bg-paper p-4">
-                <h2 className="mb-3 text-sm font-bold">{t("step1")}</h2>
-                <CameraCapture value={photo} onChange={setPhoto} t={t} />
-              </section>
-              <section className="rounded-xl border border-border bg-paper p-4">
-                <h2 className="mb-3 text-sm font-bold">{t("step2")}</h2>
-                <SoilForm value={input} onChange={setInput} t={t} />
-              </section>
-              <Button className="w-full" size="lg" disabled={busy} onClick={() => void run()}>
-                {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {busy ? t("analysing") : t("analyze")}
-              </Button>
-            </>
-          )
-        ) : reports.length === 0 ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">{t("noHistory")}</p>
+        {submitted ? (
+          <div className="rounded-xl border border-border bg-paper p-6 text-center space-y-4">
+            <div className="flex justify-center">
+              <CheckCircle2 className="h-12 w-12 text-primary" />
+            </div>
+            <h2 className="text-lg font-bold">Data Ingested Successfully!</h2>
+            <p className="text-sm text-muted-foreground">
+              Soil imagery and parameters have been collected and normalized for field: <strong>{input.fieldName}</strong>.
+            </p>
+            <Button className="w-full" onClick={() => setSubmitted(false)}>
+              Ingest Another Sample
+            </Button>
+          </div>
         ) : (
-          <ul className="space-y-3">
-            {reports.map((r) => (
-              <li key={r.id} className="rounded-xl border border-border bg-paper p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <button
-                    type="button"
-                    className="flex-1 text-left"
-                    onClick={() => {
-                      setCurrent(r);
-                      setTab("new");
-                    }}
-                  >
-                    <p className="text-sm font-semibold">
-                      {r.input.fieldName} · {r.healthScore.toFixed(1)}/100
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {t("analysis")} #{r.analysisNo} · {new Date(r.createdAt).toLocaleDateString()} ·{" "}
-                      {t(r.healthBand)}
-                    </p>
-                  </button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={t("delete")}
-                    onClick={() => setReports(deleteReport(r.id))}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <section className="rounded-xl border border-border bg-paper p-4">
+              <h2 className="mb-3 text-sm font-bold">{t("step1")}</h2>
+              <CameraCapture value={photo} onChange={setPhoto} t={t} />
+            </section>
+            <section className="rounded-xl border border-border bg-paper p-4">
+              <h2 className="mb-3 text-sm font-bold">{t("step2")}</h2>
+              <SoilForm value={input} onChange={setInput} t={t} />
+            </section>
+            <Button className="w-full" size="lg" type="submit">
+              Submit Ingestion Data
+            </Button>
+          </form>
         )}
       </main>
     </div>
   );
 }
+
