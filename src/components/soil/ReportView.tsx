@@ -1,9 +1,15 @@
+import { useState, useRef } from "react";
 import type { SoilReport, Trend } from "@/lib/soil/types";
+import type { Lang } from "@/lib/soil/i18n";
+import { speakReport } from "@/lib/soil/tts";
+import { jsPDF } from "jspdf";
+import html2canvas from "html2canvas";
 
 type Props = {
   report: SoilReport;
   trend?: Trend | null;
   t: (k: string) => string;
+  lang?: Lang;
 };
 
 function StatusChip({ status, t }: { status: string; t: (k: string) => string }) {
@@ -33,14 +39,58 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-export function ReportView({ report, trend, t }: Props) {
+export function ReportView({ report, trend, t, lang = "en" }: Props) {
   const r = report;
   const date = new Date(r.createdAt);
+  const [speaking, setSpeaking] = useState(false);
+  const stopRef = useRef<(() => void) | null>(null);
+  const reportRef = useRef<HTMLElement>(null);
+  const [downloading, setDownloading] = useState(false);
+
+  const handleSpeak = async () => {
+    if (speaking) { stopRef.current?.(); setSpeaking(false); return; }
+    const stop = await speakReport(
+      report, lang,
+      () => setSpeaking(true),
+      () => setSpeaking(false),
+      (err) => { setSpeaking(false); console.error(err); }
+    );
+    stopRef.current = stop;
+  };
+
+  const handleDownloadPdf = () => {
+    // html2canvas fails with Tailwind v4 oklch colors, so we use the robust native print API
+    window.print();
+  };
 
   return (
-    <article className="space-y-5 rounded-xl border border-border bg-paper p-5 shadow-sm">
+    <article ref={reportRef} className="space-y-5 rounded-xl border border-border bg-paper p-5 shadow-sm">
       <header>
-        <h2 className="text-xl font-extrabold uppercase tracking-tight">{t("report")}</h2>
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-xl font-extrabold uppercase tracking-tight">{t("report")}</h2>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void handleDownloadPdf()}
+              disabled={downloading}
+              className="flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-xs font-semibold text-secondary-foreground transition-all hover:bg-secondary/80 disabled:opacity-50"
+            >
+              {downloading ? "⏳" : "📥 PDF"}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleSpeak()}
+              aria-label={speaking ? "Stop listening" : "Listen to report"}
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${
+                speaking
+                  ? "bg-destructive text-destructive-foreground animate-pulse"
+                  : "bg-leaf/20 text-leaf hover:bg-leaf/30"
+              }`}
+            >
+              {speaking ? "⏹ Stop" : "🔊 Listen"}
+            </button>
+          </div>
+        </div>
         <div className="mt-1 flex items-start justify-between gap-3 text-xs text-muted-foreground">
           <div>
             <p className="text-sm text-foreground">
@@ -139,16 +189,71 @@ export function ReportView({ report, trend, t }: Props) {
       </Section>
 
       <Section title={t("bestCrops")}>
-        <ul className="space-y-1.5">
-          {r.crops.map((c) => (
-            <li key={c.crop} className="flex items-center justify-between text-sm">
-              <span>{c.crop}</span>
-              <span className="flex items-center gap-3">
-                <span className="font-semibold">{c.score}%</span>
-                <span className="w-20 text-right text-xs text-muted-foreground">{c.rating}</span>
-              </span>
-            </li>
-          ))}
+        <ul className="space-y-3">
+          {r.crops.map((c, i) => {
+            const barColor =
+              c.rating === "excellent" ? "bg-leaf" :
+              c.rating === "good"      ? "bg-emerald-500" :
+              c.rating === "moderate"  ? "bg-ochre" : "bg-destructive";
+            const waterIcon =
+              c.waterNeed === "High"   ? "💧💧💧" :
+              c.waterNeed === "Medium" ? "💧💧" : "💧";
+            return (
+              <li key={c.crop} className="rounded-lg border border-border bg-background p-3">
+                {/* Header row */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-[11px] font-bold text-muted-foreground">
+                      {i + 1}
+                    </span>
+                    <span className="text-sm font-bold">{c.crop}</span>
+                  </div>
+                  <span className="text-sm font-bold tabular-nums">{c.score}%</span>
+                </div>
+
+                {/* Score bar */}
+                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                  <div className={`h-full rounded-full ${barColor} transition-all`} style={{ width: `${c.score}%` }} />
+                </div>
+
+                {/* Meta badges */}
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <span className="rounded-sm bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                    {c.category}
+                  </span>
+                  <span className="rounded-sm bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                    {c.season}
+                  </span>
+                  <span className="rounded-sm bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                    {waterIcon} Water: {c.waterNeed}
+                  </span>
+                </div>
+
+                {/* Deficiencies */}
+                {(c.deficiencies?.length ?? 0) > 0 && (
+                  <div className="mt-2 space-y-0.5">
+                    {c.deficiencies!.map((d) => (
+                      <p key={d} className="flex items-start gap-1 text-[10px] text-destructive">
+                        <span className="mt-px shrink-0">▼</span>
+                        {d}
+                      </p>
+                    ))}
+                  </div>
+                )}
+
+                {/* Reasons */}
+                {(c.reasons?.length ?? 0) > 0 && (
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {c.reasons!.map((r) => (
+                      <span key={r} className="rounded-sm bg-leaf/20 px-1.5 py-0.5 text-[10px] font-medium text-leaf">
+                        {r}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </li>
+            );
+          })}
         </ul>
       </Section>
 
@@ -188,13 +293,41 @@ export function ReportView({ report, trend, t }: Props) {
 
       {trend && (
         <Section title={`${t("longTermTrend")} — ${t(trend.direction)}`}>
-          <p className="text-sm text-muted-foreground">
-            {trend.pointsPerRecord >= 0 ? "+" : ""}
-            {trend.pointsPerRecord} points per record.
-          </p>
+          {/* Forecast summary */}
+          <p className="text-sm text-muted-foreground">{trend.forecastSummary}</p>
+
+          {/* Predicted score timeline */}
+          {trend.predictedScore3m !== null && (
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {[
+                { label: "3 months", score: trend.predictedScore3m },
+                { label: "6 months", score: trend.predictedScore6m },
+                { label: "12 months", score: trend.predictedScore12m },
+              ].map(({ label, score }) => {
+                if (score == null) return null;
+                const color =
+                  score >= 70 ? "text-leaf" :
+                  score >= 55 ? "text-ochre" : "text-destructive";
+                return (
+                  <div key={label} className="rounded-md bg-muted p-2 text-center">
+                    <p className={`text-lg font-bold ${color}`}>{score.toFixed(0)}</p>
+                    <p className="text-[10px] text-muted-foreground">{label}</p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Model confidence */}
+          <div className="mt-2 flex items-center justify-between text-[10px] text-muted-foreground">
+            <span>OLS R² confidence: {(trend.r2Score * 100).toFixed(0)}%</span>
+            <span>Based on {trend.dataPoints} records</span>
+          </div>
+
+          {/* Critical warning */}
           {trend.seasonsToCritical !== null && (
-            <p className="mt-1 text-sm font-medium text-destructive">
-              Reaches critical in about {trend.seasonsToCritical} season(s) if unchanged.
+            <p className="mt-2 rounded-md bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">
+              Warning: Score may reach critical (&lt;40) in ~{trend.seasonsToCritical} season(s) without intervention.
             </p>
           )}
         </Section>

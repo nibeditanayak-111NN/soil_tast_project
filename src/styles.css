@@ -164,3 +164,21 @@
     color: var(--color-foreground);
   }
 }
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  article, article * {
+    visibility: visible;
+  }
+  article {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+  button {
+    display: none !important;
+  }
+}

@@ -62,10 +62,38 @@ function Index() {
     setBusy(true);
     try {
       const prediction = photo ? await classifySoilImage(photo) : undefined;
-      const report = analyzeSoil(input, prediction, photo, reports.length + 1);
+      const soilTypePrediction = prediction ? prediction.soilType : undefined;
+
+      const baseUrl = window.location.hostname === "localhost"
+        ? "http://localhost:3001"
+        : `http://${window.location.hostname}:3001`;
+
+      const res = await fetch(`${baseUrl}/api/analyze-soil`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          soilInput: input,
+          soilTypePrediction,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Backend analysis failed");
+      }
+
+      const data = await res.json();
+      const report = data.report;
+      
+      // Re-attach local image data which isn't sent to the backend
+      report.imageDataUrl = photo;
+      report.image = prediction;
+
       setReports(saveReport(report));
       setCurrent(report);
       window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (err) {
+      console.error(err);
+      alert("Error analyzing soil. Is the FastAPI backend running on port 3001?");
     } finally {
       setBusy(false);
     }
@@ -119,7 +147,7 @@ function Index() {
         {tab === "new" ? (
           current ? (
             <>
-              <ReportView report={current} trend={trend} t={t} />
+              <ReportView report={current} trend={trend} t={t} lang={lang} />
               <Button
                 className="w-full"
                 onClick={() => {

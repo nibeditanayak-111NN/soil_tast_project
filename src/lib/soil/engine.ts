@@ -204,16 +204,84 @@ export function analyzeSoil(
   };
 }
 
+function ols(xs: number[], ys: number[]): [number, number, number] {
+  const n = xs.length;
+  if (n < 2) return [0, ys[0] ?? 0, 0];
+  
+  const mx = xs.reduce((a, b) => a + b, 0) / n;
+  const my = ys.reduce((a, b) => a + b, 0) / n;
+  
+  let ss_xy = 0, ss_xx = 0;
+  for (let i = 0; i < n; i++) {
+    ss_xy += (xs[i] - mx) * (ys[i] - my);
+    ss_xx += (xs[i] - mx) ** 2;
+  }
+  
+  if (ss_xx === 0) return [0, my, 0];
+  const slope = ss_xy / ss_xx;
+  const intercept = my - slope * mx;
+  
+  let ss_tot = 0, ss_res = 0;
+  for (let i = 0; i < n; i++) {
+    ss_tot += (ys[i] - my) ** 2;
+    const yp = slope * xs[i] + intercept;
+    ss_res += (ys[i] - yp) ** 2;
+  }
+  
+  const r2 = ss_tot === 0 ? 1 : Math.max(0, 1 - ss_res / ss_tot);
+  return [slope, intercept, r2];
+}
+
 export function computeTrend(reports: SoilReport[]): Trend | null {
   if (reports.length < 2) return null;
   const ordered = [...reports].sort(
     (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
   );
-  const first = ordered[0]!;
-  const last = ordered[ordered.length - 1]!;
-  const delta = (last.healthScore - first.healthScore) / (ordered.length - 1);
-  const direction: Trend["direction"] = delta < -1 ? "declining" : delta > 1 ? "improving" : "stable";
-  const seasonsToCritical =
-    delta < -0.5 ? Math.max(1, Math.round((last.healthScore - 40) / -delta)) : null;
-  return { direction, pointsPerRecord: Math.round(delta * 10) / 10, seasonsToCritical };
+  
+  const xs = Array.from({ length: ordered.length }, (_, i) => i);
+  const ys = ordered.map(r => r.healthScore);
+  
+  const [slope, intercept, r2] = ols(xs, ys);
+  
+  const x_last = xs[xs.length - 1];
+  const predict = (x: number) => Math.round(Math.max(0, Math.min(100, slope * x + intercept)) * 10) / 10;
+  
+  const pred_3m = predict(x_last + 1);
+  const pred_6m = predict(x_last + 2);
+  const pred_12m = predict(x_last + 4);
+  
+  const current = ys[ys.length - 1];
+  const seasonsToCritical = (slope < -0.5 && current > 40)
+    ? Math.max(1, Math.round((current - 40) / Math.abs(slope)))
+    : null;
+    
+  let direction: "declining" | "stable" | "improving";
+  if (slope < -1.0) direction = "declining";
+  else if (slope > 1.0) direction = "improving";
+  else direction = "stable";
+  
+  const conf_pct = Math.round(r2 * 100);
+  const slope_r = slope.toFixed(1);
+  
+  let summary = "";
+  if (direction === "declining") {
+    summary = `Soil health is declining by ${Math.abs(Number(slope_r)).toFixed(1)} pts/season (R²=${conf_pct}%). Predicted score in 12 months: ${pred_12m}/100.`;
+    if (seasonsToCritical) summary += ` Critical (<40) in ~${seasonsToCritical} season(s) if untreated.`;
+  } else if (direction === "improving") {
+    summary = `Soil health is improving by ${slope_r} pts/season (R²=${conf_pct}%). Predicted score in 12 months: ${pred_12m}/100.`;
+  } else {
+    summary = `Soil health is stable (${Number(slope_r) >= 0 ? '+' : ''}${slope_r} pts/season, R²=${conf_pct}%). Predicted score in 12 months: ${pred_12m}/100.`;
+  }
+  
+  return {
+    direction,
+    slopePerSeason: Math.round(slope * 100) / 100,
+    r2Score: Math.round(r2 * 1000) / 1000,
+    dataPoints: ordered.length,
+    predictedScore3m: pred_3m,
+    predictedScore6m: pred_6m,
+    predictedScore12m: pred_12m,
+    seasonsToCritical,
+    forecastSummary: summary,
+  };
 }

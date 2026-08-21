@@ -1,16 +1,28 @@
 {
   "name": "Soil Health — AI Soil Assessment",
   "short_name": "Soil Health",
-  "description": "Photograph your soil, enter test readings and get AI soil health reports with fertiliser and crop recommendations in English, Hindi or Kannada.",
+  "description": "Photograph your soil, enter NPK/pH readings and get AI health scores, fertiliser dosages and crop recommendations in English, Hindi or Kannada.",
+  "lang": "en-IN",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#faf7f0",
   "theme_color": "#7a4a2b",
+  "categories": ["health", "productivity", "agriculture"],
+  "screenshots": [],
   "icons": [
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "New Soil Analysis",
+      "short_name": "Analyse",
+      "description": "Start a new soil analysis",
+      "url": "/?tab=new",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
   ]
-}
+}

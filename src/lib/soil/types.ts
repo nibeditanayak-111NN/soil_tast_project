@@ -42,6 +42,11 @@ export type CropSuggestion = {
   crop: string;
   score: number;
   rating: "excellent" | "good" | "moderate" | "poor";
+  category: string;
+  season: string;
+  waterNeed: "Low" | "Medium" | "High";
+  deficiencies: string[];
+  reasons: string[];
 };
 
 export type SoilReport = {
@@ -63,6 +68,12 @@ export type SoilReport = {
 
 export type Trend = {
   direction: "declining" | "stable" | "improving";
-  pointsPerRecord: number;
+  slopePerSeason: number;
+  r2Score: number;
+  dataPoints: number;
+  predictedScore3m: number | null;
+  predictedScore6m: number | null;
+  predictedScore12m: number | null;
   seasonsToCritical: number | null;
+  forecastSummary: string;
 };
