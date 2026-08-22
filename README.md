@@ -1,29 +1,44 @@
-# Welcome to your Lovable project
+# Soil Health AI Nutrient Diagnosis
 
-This project was built with [Lovable](https://lovable.dev).
+A full-stack, mobile-first Progressive Web App (PWA) for AI-driven soil health diagnosis and recommendations.
 
-## Build with Lovable
+## Architecture
 
-Open your project in the [Lovable editor](https://lovable.dev) and keep building.
+This project uses a modern monorepo structure:
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: connect the project to GitHub and every change made in Lovable is committed straight to your repository.
-- **Full ownership**: this code is yours. Push to your repository and your changes sync back into Lovable, ready for your next prompt.
+- **/frontend**: A Vite + React application configured as an installable PWA with offline support.
+- **/backend**: A FastAPI (Python) backend featuring a machine learning inference engine and structured PostgreSQL schemas.
 
-## Development
+## Features
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+- 📸 **Camera Capture**: Directly take photos of soil from the field using the native browser `MediaDevices` API.
+- 🧪 **Nutrient Diagnostics**: Analyze Nitrogen (N), Phosphorus (P), Potassium (K), pH, and organic matter levels.
+- 🤖 **ML Inference**: Machine learning recommendations for fertilizer formulations, crop suitability, and long-term soil degradation trend prediction.
+- 🗣️ **Sarvam AI & i18n**: Multi-lingual interface (Hindi, Kannada) with AI-powered regional text-to-speech for farmers.
+- 📥 **PDF Reports**: Native Print-to-PDF export capabilities for offline reading.
 
+## Getting Started
+
+### Using Docker (Recommended)
+You can start the entire stack simultaneously using Docker Compose:
 ```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
+docker-compose up --build
+```
+- Frontend will be available at: `http://localhost:8080`
+- Backend API will be available at: `http://localhost:3001`
+
+### Running Locally
+
+**1. Start the Backend:**
+```sh
+cd backend
+python -m pip install -r requirements.txt
+python -m uvicorn app.main:app --reload --port 3001
 ```
 
-## Built with
-
-- TanStack Start
-- TypeScript
-- React
-- Tailwind CSS
+**2. Start the Frontend:**
+```sh
+cd frontend
+npm install
+npm run dev
+```
