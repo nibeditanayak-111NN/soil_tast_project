@@ -6,9 +6,9 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from models import (
+from app.schemas.models import (
     SoilTestInput, SoilAnalysisReport, NutrientRow, Amendment,
-    CropRecommendation, ShapEntry, Trend,
+    CropRecommendation, ShapEntry, Trend
 )
 
 BASE_SCORE = 100.0

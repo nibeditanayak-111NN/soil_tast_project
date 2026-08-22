@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
-from engine import compute_trend
-import db
+from app.ml.inference import compute_trend
+from app.core import database as db
 
 router = APIRouter()
 

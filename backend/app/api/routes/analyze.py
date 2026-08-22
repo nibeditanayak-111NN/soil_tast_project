@@ -1,7 +1,7 @@
 from fastapi import APIRouter
-from models import AnalyzeSoilRequest
-from engine import analyze_soil
-import db
+from app.schemas.models import AnalyzeSoilRequest
+from app.ml.inference import analyze_soil
+from app.core import database as db
 import boto3
 import uuid
 import base64

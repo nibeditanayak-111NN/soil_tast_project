@@ -1,5 +1,5 @@
 # In-memory store — replace with SQLite/PostgreSQL for production
-from models import SoilAnalysisReport
+from app.schemas.models import SoilAnalysisReport
 
 _store: dict[str, SoilAnalysisReport] = {}
 

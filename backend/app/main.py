@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 
-from routers import health, analyze, fields, translations
+from app.api.routes import health, analyze, fields, translations
 
 app = FastAPI(
     title="AI Soil Health Assessment System API",

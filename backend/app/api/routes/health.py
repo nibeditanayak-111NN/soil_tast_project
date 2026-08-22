@@ -1,6 +1,6 @@
 import time
 from fastapi import APIRouter
-import db
+from app.core import database as db
 
 router = APIRouter()
 _start = time.time()
