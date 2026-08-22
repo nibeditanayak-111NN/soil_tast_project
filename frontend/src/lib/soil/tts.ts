@@ -69,10 +69,32 @@ export async function speakReport(
   onError?: (err: string) => void
 ): Promise<() => void> {
   if (!SARVAM_API_KEY) {
-    const msg = "VITE_SARVAM_API_KEY is not set. Add it to your .env file.";
+    const msg = "VITE_SARVAM_API_KEY is not set. Falling back to native browser speech synthesis.";
     console.warn("[TTS]", msg);
-    onError?.(msg);
-    return () => {};
+    
+    // Native Browser Fallback
+    try {
+      onStart?.();
+      const text = buildSummaryText(report, lang);
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = LANG_MAP[lang] || "en-US";
+      
+      utterance.onend = () => onEnd?.();
+      utterance.onerror = (e) => {
+        console.error("Native TTS Error", e);
+        onError?.("Native TTS failed.");
+        onEnd?.();
+      };
+      
+      window.speechSynthesis.speak(utterance);
+      
+      return () => {
+        window.speechSynthesis.cancel();
+      };
+    } catch (e) {
+      onError?.("Text to speech is not supported in your browser.");
+      return () => {};
+    }
   }
 
   const text       = buildSummaryText(report, lang);
