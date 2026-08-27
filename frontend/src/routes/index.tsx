@@ -1,6 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Sprout, Trash2 } from "lucide-react";
+import { Loader2, LogOut, Sprout, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CameraCapture } from "@/components/soil/CameraCapture";
 import { SoilForm } from "@/components/soil/SoilForm";
@@ -10,6 +10,7 @@ import { classifySoilImage } from "@/lib/soil/vision";
 import { deleteReport, loadReports, saveReport } from "@/lib/soil/storage";
 import { langNames, makeT, type Lang } from "@/lib/soil/i18n";
 import type { SoilReport, SoilTestInput } from "@/lib/soil/types";
+import { clearSession, getSession } from "@/lib/auth";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -44,8 +45,21 @@ const DEFAULT_INPUT: SoilTestInput = {
 };
 
 function Index() {
+  const navigate = useNavigate();
   const [lang, setLang] = useState<Lang>("en");
   const t = useMemo(() => makeT(lang), [lang]);
+  const [user, setUser] = useState(getSession);
+
+  // Auth guard — redirect to login if no session
+  useEffect(() => {
+    if (!user) navigate({ to: "/login" });
+  }, [user, navigate]);
+
+  const handleLogout = () => {
+    clearSession();
+    setUser(null);
+    navigate({ to: "/login" });
+  };
 
   const [tab, setTab] = useState<"new" | "history">("new");
   const [input, setInput] = useState<SoilTestInput>(DEFAULT_INPUT);
@@ -55,6 +69,8 @@ function Index() {
   const [current, setCurrent] = useState<SoilReport | null>(null);
 
   useEffect(() => setReports(loadReports()), []);
+
+  if (!user) return null; // avoid flash before redirect
 
   const trend = useMemo(() => computeTrend(reports), [reports]);
 
@@ -112,7 +128,7 @@ function Index() {
               <p className="text-[11px] text-muted-foreground">{t("tagline")}</p>
             </div>
           </div>
-          <div className="flex gap-1">
+          <div className="flex items-center gap-1">
             {(Object.keys(langNames) as Lang[]).map((l) => (
               <button
                 key={l}
@@ -125,6 +141,16 @@ function Index() {
                 {langNames[l]}
               </button>
             ))}
+            <button
+              id="logout-btn"
+              type="button"
+              onClick={handleLogout}
+              title={`Logout (${user?.name})`}
+              className="ml-1 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition"
+              aria-label="Logout"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
         </div>
         <nav className="mx-auto flex max-w-xl gap-2 px-4 pb-2">
