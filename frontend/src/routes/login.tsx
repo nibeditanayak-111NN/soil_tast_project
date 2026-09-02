@@ -8,6 +8,7 @@ import {
   Lock,
   Mail,
   User,
+  UserPlus,
   MapPin,
   Globe2,
   CheckCircle2,
@@ -15,7 +16,10 @@ import {
   ShieldCheck,
   Sparkles,
   KeyRound,
-  RefreshCw,
+  Users,
+  Trash2,
+  LogIn,
+  ChevronRight,
 } from "lucide-react";
 import {
   getSession,
@@ -23,27 +27,31 @@ import {
   registerUser,
   requestPasswordReset,
   getAllUsers,
+  loginWithProfile,
+  removeSavedAccount,
+  type UserProfile,
 } from "@/lib/auth";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
     meta: [
-      { title: "Authentication — Soil Health AI Platform" },
+      { title: "Authentication & Accounts — Soil Health AI" },
       {
         name: "description",
-        content: "Sign in or create a new account to access your AI Soil Health and Crop Recommendation dashboard.",
+        content: "Sign in, switch account, or register a new farmer profile on the Soil Health AI Platform.",
       },
     ],
   }),
   component: AuthPage,
 });
 
-type AuthMode = "login" | "register" | "forgot";
+type AuthMode = "choose_account" | "login" | "register" | "forgot";
 
 function AuthPage() {
   const navigate = useNavigate();
 
-  const [mode, setMode] = useState<AuthMode>("login");
+  const [savedUsers, setSavedUsers] = useState<UserProfile[]>([]);
+  const [mode, setMode] = useState<AuthMode>("choose_account");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
@@ -67,14 +75,45 @@ function AuthPage() {
   // Forgot password state
   const [forgotEmail, setForgotEmail] = useState("");
 
-  // If already logged in, redirect directly to dashboard
+  // Load saved accounts on mount
+  useEffect(() => {
+    const users = getAllUsers();
+    setSavedUsers(users);
+    if (users.length === 0) {
+      setMode("login");
+    }
+  }, []);
+
+  // If already logged in, redirect directly to dashboard unless user navigated with intent
   useEffect(() => {
     if (getSession()) {
       navigate({ to: "/" });
     }
   }, [navigate]);
 
-  // Handle Login
+  // Handle Quick Account Selection from Saved List
+  const handleSelectAccount = async (user: UserProfile) => {
+    setLoading(true);
+    setError("");
+    await new Promise((r) => setTimeout(r, 450));
+    const result = loginWithProfile(user, true);
+    setLoading(false);
+    if (result.success) {
+      navigate({ to: "/" });
+    }
+  };
+
+  // Handle Remove Account from device
+  const handleRemoveAccount = (e: React.MouseEvent, userId: string) => {
+    e.stopPropagation();
+    const updated = removeSavedAccount(userId);
+    setSavedUsers(updated);
+    if (updated.length === 0) {
+      setMode("login");
+    }
+  };
+
+  // Handle Login with Email & Password
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -121,12 +160,12 @@ function AuthPage() {
       return;
     }
     if (!acceptTerms) {
-      setError("Please agree to the Terms of Service & Agricultural Privacy Policy.");
+      setError("Please agree to the Terms of Service.");
       return;
     }
 
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 800));
+    await new Promise((r) => setTimeout(r, 750));
 
     const result = registerUser({
       name: regName,
@@ -137,8 +176,7 @@ function AuthPage() {
     });
 
     if (result.success && result.user) {
-      // Automatically log them in
-      authenticateUser(result.user.email, regPassword, true);
+      loginWithProfile(result.user, true);
       setLoading(false);
       navigate({ to: "/" });
     } else {
@@ -159,33 +197,22 @@ function AuthPage() {
     }
 
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 700));
+    await new Promise((r) => setTimeout(r, 600));
     setLoading(false);
 
     const result = requestPasswordReset(forgotEmail);
-    setSuccessMsg(
-      `${result.message} (Demo OTP: 849201. Use your previous password or create a new account).`
-    );
+    setSuccessMsg(`${result.message} (Demo OTP: 849201)`);
   };
 
-  // Quick Demo Login Handler
-  const handleQuickDemoLogin = (email: string, pass: string) => {
-    setLoginEmail(email);
-    setLoginPassword(pass);
-    setError("");
-    authenticateUser(email, pass, true);
-    navigate({ to: "/" });
+  // Helper to extract initials
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase();
   };
-
-  // Password Strength Calculator
-  const getPasswordStrength = (pass: string) => {
-    if (!pass) return { label: "", color: "bg-muted", width: "0%" };
-    if (pass.length < 6) return { label: "Weak", color: "bg-destructive", width: "30%" };
-    if (pass.length < 10) return { label: "Medium", color: "bg-yellow-500", width: "65%" };
-    return { label: "Strong", color: "bg-emerald-500", width: "100%" };
-  };
-
-  const strength = getPasswordStrength(regPassword);
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-background">
@@ -227,20 +254,20 @@ function AuthPage() {
           </h1>
           <p className="text-white/80 text-sm lg:text-base leading-relaxed max-w-md">
             Empowering farmers, agronomists, and researchers with AI-driven nutrient detection,
-            computer-vision soil profiling, fertilizer optimization, and automated advisory in local languages.
+            soil health monitoring, fertilizer optimization, and voice advisory.
           </p>
         </div>
 
-        {/* Middle Feature Highlights */}
+        {/* Middle Highlights */}
         <div className="relative z-10 space-y-3 my-6">
           {[
             {
-              title: "Precise N-P-K Nutrient Mapping",
-              desc: "Instant deficiency diagnosis with automated fertilizer split dosages.",
+              title: "Multi-Account Farm Profiles",
+              desc: "Seamlessly switch between farm holdings, co-farmers, and regional plots.",
             },
             {
-              title: "AI Crop Recommendations",
-              desc: "Ranked suitability matching across 25+ crops and multi-season cycles.",
+              title: "Precise N-P-K Nutrient Mapping",
+              desc: "Instant deficiency diagnosis with automated fertilizer split dosages.",
             },
             {
               title: "Multilingual Voice Advisory",
@@ -291,54 +318,6 @@ function AuthPage() {
             </div>
           </div>
 
-          {/* Mode Switcher Tabs */}
-          <div className="flex rounded-xl bg-muted p-1 border border-border">
-            <button
-              type="button"
-              onClick={() => {
-                setMode("login");
-                setError("");
-                setSuccessMsg("");
-              }}
-              className={`flex-1 py-2 text-xs font-semibold rounded-lg transition ${
-                mode === "login"
-                  ? "bg-card text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Sign In (Log In)
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMode("register");
-                setError("");
-                setSuccessMsg("");
-              }}
-              className={`flex-1 py-2 text-xs font-semibold rounded-lg transition ${
-                mode === "register"
-                  ? "bg-card text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Create Account
-            </button>
-          </div>
-
-          {/* Form Header Info */}
-          <div>
-            <h2 className="text-2xl font-bold text-foreground tracking-tight">
-              {mode === "login" && "Welcome Back 👋"}
-              {mode === "register" && "Create Farmer Account 🌱"}
-              {mode === "forgot" && "Reset Your Password 🔑"}
-            </h2>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-              {mode === "login" && "Enter your registered credentials to access your soil analyses."}
-              {mode === "register" && "Join the platform to track field health and receive tailored advice."}
-              {mode === "forgot" && "Enter your email to receive password recovery instructions."}
-            </p>
-          </div>
-
           {/* Feedback Messages */}
           {error && (
             <div className="p-3 text-xs sm:text-sm font-medium text-destructive bg-destructive/10 border border-destructive/20 rounded-xl flex items-start gap-2">
@@ -355,324 +334,56 @@ function AuthPage() {
           )}
 
           {/* ══════════════════════════════════════════════════════════ */}
-          {/* 1. SIGN IN (LOG IN) FORM                                   */}
+          {/* 1. CHOOSE ACCOUNT VIEW (Multi-Account Switcher)             */}
           {/* ══════════════════════════════════════════════════════════ */}
-          {mode === "login" && (
-            <form onSubmit={handleLogin} className="space-y-4">
-              {/* Email Input */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                  <Mail className="w-3.5 h-3.5 text-muted-foreground" />
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  required
-                  placeholder="farmer@soil.ai"
-                  value={loginEmail}
-                  onChange={(e) => setLoginEmail(e.target.value)}
-                  className="w-full rounded-xl border border-input bg-card px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
-                  autoComplete="email"
-                />
+          {mode === "choose_account" && (
+            <div className="space-y-5">
+              <div>
+                <h2 className="text-2xl font-bold text-foreground tracking-tight">
+                  Choose an Account 👤
+                </h2>
+                <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+                  Select an account saved on this device, or sign in to another account.
+                </p>
               </div>
 
-              {/* Password Input */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                    <Lock className="w-3.5 h-3.5 text-muted-foreground" />
-                    Password
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMode("forgot");
-                      setError("");
-                      setSuccessMsg("");
-                    }}
-                    className="text-xs text-primary font-medium hover:underline"
+              {/* Saved Accounts List */}
+              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                {savedUsers.map((user) => (
+                  <div
+                    key={user.id}
+                    onClick={() => handleSelectAccount(user)}
+                    className="w-full flex items-center justify-between p-3 rounded-2xl border border-border bg-card hover:bg-accent/70 hover:border-primary/40 cursor-pointer transition text-left group shadow-sm"
                   >
-                    Forgot Password?
-                  </button>
-                </div>
-                <div className="relative">
-                  <input
-                    type={showLoginPassword ? "text" : "password"}
-                    required
-                    placeholder="••••••••"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    className="w-full rounded-xl border border-input bg-card px-3.5 py-2.5 pr-10 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
-                    autoComplete="current-password"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowLoginPassword(!showLoginPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    aria-label="Toggle Password Visibility"
-                  >
-                    {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Remember Me */}
-              <div className="flex items-center justify-between pt-1">
-                <label className="flex items-center gap-2 cursor-pointer text-xs text-muted-foreground">
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    className="rounded border-input text-primary focus:ring-primary h-3.5 w-3.5"
-                  />
-                  Keep me signed in on this device
-                </label>
-              </div>
-
-              {/* Submit Button */}
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground shadow-md hover:bg-primary/90 active:scale-[0.99] transition disabled:opacity-50"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Verifying Credentials…
-                  </>
-                ) : (
-                  <>
-                    Sign In to Dashboard
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </button>
-
-              {/* Quick Demo Logins */}
-              <div className="pt-3 border-t border-border space-y-2">
-                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block text-center">
-                  ⚡ 1-Click Quick Demo Accounts
-                </span>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleQuickDemoLogin("nibedita@soil.ai", "soil2026")}
-                    className="p-2 text-xs rounded-lg border border-border bg-card hover:bg-accent text-left transition"
-                  >
-                    <div className="font-semibold text-foreground truncate">Nibedita Nayak</div>
-                    <div className="text-[10px] text-muted-foreground">nibedita@soil.ai</div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickDemoLogin("ramesh@farm.in", "farmer123")}
-                    className="p-2 text-xs rounded-lg border border-border bg-card hover:bg-accent text-left transition"
-                  >
-                    <div className="font-semibold text-foreground truncate">Ramesh Kumar</div>
-                    <div className="text-[10px] text-muted-foreground">ramesh@farm.in</div>
-                  </button>
-                </div>
-              </div>
-            </form>
-          )}
-
-          {/* ══════════════════════════════════════════════════════════ */}
-          {/* 2. CREATE A NEW ACCOUNT (REGISTER) FORM                    */}
-          {/* ══════════════════════════════════════════════════════════ */}
-          {mode === "register" && (
-            <form onSubmit={handleRegister} className="space-y-3.5">
-              {/* Full Name */}
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                  <User className="w-3.5 h-3.5 text-muted-foreground" />
-                  Full Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Nibedita Nayak"
-                  value={regName}
-                  onChange={(e) => setRegName(e.target.value)}
-                  className="w-full rounded-xl border border-input bg-card px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
-                />
-              </div>
-
-              {/* Email Address */}
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                  <Mail className="w-3.5 h-3.5 text-muted-foreground" />
-                  Email Address *
-                </label>
-                <input
-                  type="email"
-                  required
-                  placeholder="name@farm.org"
-                  value={regEmail}
-                  onChange={(e) => setRegEmail(e.target.value)}
-                  className="w-full rounded-xl border border-input bg-card px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
-                />
-              </div>
-
-              {/* Location & Language in 2-Columns */}
-              <div className="grid grid-cols-2 gap-2.5">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-foreground flex items-center gap-1">
-                    <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
-                    Village / Region
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Warangal"
-                    value={regVillage}
-                    onChange={(e) => setRegVillage(e.target.value)}
-                    className="w-full rounded-xl border border-input bg-card px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-foreground flex items-center gap-1">
-                    <Globe2 className="w-3.5 h-3.5 text-muted-foreground" />
-                    Language
-                  </label>
-                  <select
-                    value={regLang}
-                    onChange={(e) => setRegLang(e.target.value as any)}
-                    className="w-full rounded-xl border border-input bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
-                  >
-                    <option value="en">English</option>
-                    <option value="hi">हिन्दी (Hindi)</option>
-                    <option value="kn">ಕನ್ನಡ (Kannada)</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Password */}
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                  <Lock className="w-3.5 h-3.5 text-muted-foreground" />
-                  Create Password *
-                </label>
-                <div className="relative">
-                  <input
-                    type={showRegPassword ? "text" : "password"}
-                    required
-                    placeholder="Minimum 6 characters"
-                    value={regPassword}
-                    onChange={(e) => setRegPassword(e.target.value)}
-                    className="w-full rounded-xl border border-input bg-card px-3.5 py-2.5 pr-10 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowRegPassword(!showRegPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    {showRegPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-                {/* Strength Meter */}
-                {regPassword && (
-                  <div className="pt-1">
-                    <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-                      <div
-                        className={`h-full transition-all duration-300 ${strength.color}`}
-                        style={{ width: strength.width }}
-                      />
+                    <div className="flex items-center gap-3 truncate">
+                      <div className="w-10 h-10 rounded-xl bg-primary/15 text-primary font-bold flex items-center justify-center shrink-0 text-sm border border-primary/20">
+                        {getInitials(user.name)}
+                      </div>
+                      <div className="truncate">
+                        <div className="text-sm font-bold text-foreground group-hover:text-primary transition truncate">
+                          {user.name}
+                        </div>
+                        <div className="text-xs text-muted-foreground truncate">
+                          {user.email} {user.village ? `• ${user.village}` : ""}
+                        </div>
+                      </div>
                     </div>
-                    <span className="text-[10px] text-muted-foreground mt-0.5 block">
-                      Strength: <strong className="text-foreground">{strength.label}</strong>
-                    </span>
+                    <div className="flex items-center gap-1 shrink-0 ml-2">
+                      <button
+                        type="button"
+                        onClick={(e) => handleRemoveAccount(e, user.id)}
+                        title="Remove from device"
+                        className="p-1.5 text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 rounded-lg transition"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 transition" />
+                    </div>
                   </div>
-                )}
+                ))}
               </div>
 
-              {/* Confirm Password */}
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-muted-foreground" />
-                  Confirm Password *
-                </label>
-                <input
-                  type="password"
-                  required
-                  placeholder="Re-type your password"
-                  value={regConfirmPassword}
-                  onChange={(e) => setRegConfirmPassword(e.target.value)}
-                  className="w-full rounded-xl border border-input bg-card px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
-                />
-              </div>
-
-              {/* Consent Terms */}
-              <div className="pt-1">
-                <label className="flex items-start gap-2 cursor-pointer text-xs text-muted-foreground leading-snug">
-                  <input
-                    type="checkbox"
-                    checked={acceptTerms}
-                    onChange={(e) => setAcceptTerms(e.target.checked)}
-                    className="rounded border-input text-primary focus:ring-primary h-3.5 w-3.5 mt-0.5"
-                  />
-                  <span>
-                    I agree to the <strong>Terms of Service</strong> &amp; acknowledge that soil recommendations are AI-assisted estimates.
-                  </span>
-                </label>
-              </div>
-
-              {/* Submit Register */}
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground shadow-md hover:bg-primary/90 active:scale-[0.99] transition disabled:opacity-50 mt-2"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Creating Your Account…
-                  </>
-                ) : (
-                  <>
-                    Complete Registration &amp; Sign In
-                    <Sparkles className="w-4 h-4 text-amber-300" />
-                  </>
-                )}
-              </button>
-            </form>
-          )}
-
-          {/* ══════════════════════════════════════════════════════════ */}
-          {/* 3. FORGOT PASSWORD FORM                                    */}
-          {/* ══════════════════════════════════════════════════════════ */}
-          {mode === "forgot" && (
-            <form onSubmit={handleForgotPassword} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                  <Mail className="w-3.5 h-3.5 text-muted-foreground" />
-                  Registered Email Address
-                </label>
-                <input
-                  type="email"
-                  required
-                  placeholder="your-email@farm.org"
-                  value={forgotEmail}
-                  onChange={(e) => setForgotEmail(e.target.value)}
-                  className="w-full rounded-xl border border-input bg-card px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground shadow-md hover:bg-primary/90 transition disabled:opacity-50"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Sending Recovery Code…
-                  </>
-                ) : (
-                  <>
-                    Send Recovery Code
-                    <KeyRound className="w-4 h-4" />
-                  </>
-                )}
-              </button>
-
+              {/* ➕ Use Another Account Button */}
               <button
                 type="button"
                 onClick={() => {
@@ -680,34 +391,398 @@ function AuthPage() {
                   setError("");
                   setSuccessMsg("");
                 }}
-                className="w-full text-center text-xs font-medium text-muted-foreground hover:text-foreground pt-2"
+                className="w-full flex items-center justify-center gap-2 p-3.5 rounded-2xl border-2 border-dashed border-border hover:border-primary bg-card/60 hover:bg-primary/5 text-sm font-semibold text-foreground transition group"
               >
-                ← Back to Sign In
+                <LogIn className="w-4 h-4 text-primary group-hover:scale-110 transition" />
+                <span>Use Another Account</span>
               </button>
-            </form>
+
+              {/* ➕ Create New Account Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("register");
+                  setError("");
+                  setSuccessMsg("");
+                }}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-muted hover:bg-muted/80 text-xs font-semibold text-muted-foreground hover:text-foreground transition"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>Create a New Account</span>
+              </button>
+            </div>
           )}
 
-          {/* Bottom Switcher */}
-          <div className="text-center pt-2">
-            {mode === "login" && (
-              <p className="text-xs text-muted-foreground">
-                Don't have an account yet?{" "}
+          {/* ══════════════════════════════════════════════════════════ */}
+          {/* 2. SIGN IN (LOG IN) FORM                                   */}
+          {/* ══════════════════════════════════════════════════════════ */}
+          {mode === "login" && (
+            <div className="space-y-5">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <h2 className="text-2xl font-bold text-foreground tracking-tight">
+                    Sign In 🔑
+                  </h2>
+                  {savedUsers.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setMode("choose_account")}
+                      className="text-xs text-primary font-semibold hover:underline flex items-center gap-1"
+                    >
+                      <Users className="w-3.5 h-3.5" />
+                      Saved Accounts ({savedUsers.length})
+                    </button>
+                  )}
+                </div>
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  Sign in with your email address and password.
+                </p>
+              </div>
+
+              <form onSubmit={handleLogin} className="space-y-4">
+                {/* Email Input */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5 text-muted-foreground" />
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="farmer@soil.ai"
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    className="w-full rounded-xl border border-input bg-card px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
+                    autoComplete="email"
+                  />
+                </div>
+
+                {/* Password Input */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                      <Lock className="w-3.5 h-3.5 text-muted-foreground" />
+                      Password
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMode("forgot");
+                        setError("");
+                        setSuccessMsg("");
+                      }}
+                      className="text-xs text-primary font-medium hover:underline"
+                    >
+                      Forgot Password?
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type={showLoginPassword ? "text" : "password"}
+                      required
+                      placeholder="••••••••"
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      className="w-full rounded-xl border border-input bg-card px-3.5 py-2.5 pr-10 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
+                      autoComplete="current-password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowLoginPassword(!showLoginPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Remember Me */}
+                <div className="flex items-center justify-between pt-1">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="rounded border-input text-primary focus:ring-primary h-3.5 w-3.5"
+                    />
+                    Save this account on this device
+                  </label>
+                </div>
+
+                {/* Submit Button */}
                 <button
-                  type="button"
-                  onClick={() => {
-                    setMode("register");
-                    setError("");
-                    setSuccessMsg("");
-                  }}
-                  className="font-semibold text-primary hover:underline"
+                  type="submit"
+                  disabled={loading}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground shadow-md hover:bg-primary/90 active:scale-[0.99] transition disabled:opacity-50"
                 >
-                  Create a New Account
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Signing In…
+                    </>
+                  ) : (
+                    <>
+                      Sign In to Dashboard
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
                 </button>
-              </p>
-            )}
-            {mode === "register" && (
-              <p className="text-xs text-muted-foreground">
-                Already registered?{" "}
+
+                {/* Switcher */}
+                <div className="pt-3 text-center border-t border-border">
+                  <p className="text-xs text-muted-foreground">
+                    Need a new account?{" "}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMode("register");
+                        setError("");
+                        setSuccessMsg("");
+                      }}
+                      className="font-semibold text-primary hover:underline"
+                    >
+                      Create a New Account
+                    </button>
+                  </p>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════ */}
+          {/* 3. CREATE A NEW ACCOUNT (REGISTER) FORM                    */}
+          {/* ══════════════════════════════════════════════════════════ */}
+          {mode === "register" && (
+            <div className="space-y-5">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <h2 className="text-2xl font-bold text-foreground tracking-tight">
+                    Create Account 🌱
+                  </h2>
+                  {savedUsers.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setMode("choose_account")}
+                      className="text-xs text-primary font-semibold hover:underline"
+                    >
+                      ← Saved Accounts
+                    </button>
+                  )}
+                </div>
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  Create a new farmer or researcher account.
+                </p>
+              </div>
+
+              <form onSubmit={handleRegister} className="space-y-3.5">
+                {/* Full Name */}
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <User className="w-3.5 h-3.5 text-muted-foreground" />
+                    Full Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Nibedita Nayak"
+                    value={regName}
+                    onChange={(e) => setRegName(e.target.value)}
+                    className="w-full rounded-xl border border-input bg-card px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
+                  />
+                </div>
+
+                {/* Email Address */}
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5 text-muted-foreground" />
+                    Email Address *
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="name@farm.org"
+                    value={regEmail}
+                    onChange={(e) => setRegEmail(e.target.value)}
+                    className="w-full rounded-xl border border-input bg-card px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
+                  />
+                </div>
+
+                {/* Location & Language */}
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-foreground flex items-center gap-1">
+                      <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
+                      Village / Region
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Warangal"
+                      value={regVillage}
+                      onChange={(e) => setRegVillage(e.target.value)}
+                      className="w-full rounded-xl border border-input bg-card px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-foreground flex items-center gap-1">
+                      <Globe2 className="w-3.5 h-3.5 text-muted-foreground" />
+                      Language
+                    </label>
+                    <select
+                      value={regLang}
+                      onChange={(e) => setRegLang(e.target.value as any)}
+                      className="w-full rounded-xl border border-input bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
+                    >
+                      <option value="en">English</option>
+                      <option value="hi">हिन्दी (Hindi)</option>
+                      <option value="kn">ಕನ್ನಡ (Kannada)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Password */}
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <Lock className="w-3.5 h-3.5 text-muted-foreground" />
+                    Create Password *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showRegPassword ? "text" : "password"}
+                      required
+                      placeholder="Minimum 6 characters"
+                      value={regPassword}
+                      onChange={(e) => setRegPassword(e.target.value)}
+                      className="w-full rounded-xl border border-input bg-card px-3.5 py-2.5 pr-10 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowRegPassword(!showRegPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showRegPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Confirm Password */}
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-muted-foreground" />
+                    Confirm Password *
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="Re-type your password"
+                    value={regConfirmPassword}
+                    onChange={(e) => setRegConfirmPassword(e.target.value)}
+                    className="w-full rounded-xl border border-input bg-card px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
+                  />
+                </div>
+
+                {/* Terms Consent */}
+                <div className="pt-1">
+                  <label className="flex items-start gap-2 cursor-pointer text-xs text-muted-foreground leading-snug">
+                    <input
+                      type="checkbox"
+                      checked={acceptTerms}
+                      onChange={(e) => setAcceptTerms(e.target.checked)}
+                      className="rounded border-input text-primary focus:ring-primary h-3.5 w-3.5 mt-0.5"
+                    />
+                    <span>
+                      I agree to the <strong>Terms of Service</strong> &amp; Farm Advisory Policy.
+                    </span>
+                  </label>
+                </div>
+
+                {/* Submit Register */}
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground shadow-md hover:bg-primary/90 active:scale-[0.99] transition disabled:opacity-50 mt-2"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Creating Account…
+                    </>
+                  ) : (
+                    <>
+                      Register &amp; Open Dashboard
+                      <Sparkles className="w-4 h-4 text-amber-300" />
+                    </>
+                  )}
+                </button>
+
+                {/* Switch to Login */}
+                <div className="pt-2 text-center border-t border-border">
+                  <p className="text-xs text-muted-foreground">
+                    Already have an account?{" "}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMode("login");
+                        setError("");
+                        setSuccessMsg("");
+                      }}
+                      className="font-semibold text-primary hover:underline"
+                    >
+                      Sign In here
+                    </button>
+                  </p>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════ */}
+          {/* 4. FORGOT PASSWORD FORM                                    */}
+          {/* ══════════════════════════════════════════════════════════ */}
+          {mode === "forgot" && (
+            <div className="space-y-5">
+              <div>
+                <h2 className="text-2xl font-bold text-foreground tracking-tight">
+                  Reset Password 🔑
+                </h2>
+                <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+                  Enter your email address to receive recovery instructions.
+                </p>
+              </div>
+
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5 text-muted-foreground" />
+                    Registered Email Address
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="your-email@farm.org"
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    className="w-full rounded-xl border border-input bg-card px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground shadow-md hover:bg-primary/90 transition disabled:opacity-50"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Sending Recovery Code…
+                    </>
+                  ) : (
+                    <>
+                      Send Recovery Code
+                      <KeyRound className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+
                 <button
                   type="button"
                   onClick={() => {
@@ -715,13 +790,13 @@ function AuthPage() {
                     setError("");
                     setSuccessMsg("");
                   }}
-                  className="font-semibold text-primary hover:underline"
+                  className="w-full text-center text-xs font-medium text-muted-foreground hover:text-foreground pt-2"
                 >
-                  Sign In here
+                  ← Back to Sign In
                 </button>
-              </p>
-            )}
-          </div>
+              </form>
+            </div>
+          )}
         </div>
       </div>
     </div>

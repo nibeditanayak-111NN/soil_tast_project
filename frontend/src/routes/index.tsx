@@ -1,6 +1,17 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, LogOut, Sprout, Trash2 } from "lucide-react";
+import {
+  Loader2,
+  LogOut,
+  Sprout,
+  Trash2,
+  User,
+  Users,
+  ChevronDown,
+  UserPlus,
+  Check,
+  LogIn,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CameraCapture } from "@/components/soil/CameraCapture";
 import { SoilForm } from "@/components/soil/SoilForm";
@@ -10,7 +21,13 @@ import { classifySoilImage } from "@/lib/soil/vision";
 import { deleteReport, loadReports, saveReport } from "@/lib/soil/storage";
 import { langNames, makeT, type Lang } from "@/lib/soil/i18n";
 import type { SoilReport, SoilTestInput } from "@/lib/soil/types";
-import { clearSession, getSession } from "@/lib/auth";
+import {
+  clearSession,
+  getSession,
+  getAllUsers,
+  loginWithProfile,
+  type UserProfile,
+} from "@/lib/auth";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -47,6 +64,8 @@ const DEFAULT_INPUT: SoilTestInput = {
 function Index() {
   const navigate = useNavigate();
   const [user, setUser] = useState(getSession);
+  const [savedUsers, setSavedUsers] = useState<UserProfile[]>(() => getAllUsers());
+  const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [lang, setLang] = useState<Lang>(() => user?.preferredLang || "en");
   const t = useMemo(() => makeT(lang), [lang]);
 
@@ -61,6 +80,21 @@ function Index() {
       setUser(null);
       navigate({ to: "/login" });
     }
+  };
+
+  const handleSwitchAccount = (targetUser: UserProfile) => {
+    loginWithProfile(targetUser, true);
+    setUser(targetUser);
+    if (targetUser.preferredLang) setLang(targetUser.preferredLang);
+    if (targetUser.village) {
+      setInput((prev) => ({ ...prev, village: targetUser.village || prev.village }));
+    }
+    setShowAccountMenu(false);
+  };
+
+  const handleUseAnotherAccount = () => {
+    clearSession();
+    navigate({ to: "/login" });
   };
 
   const [tab, setTab] = useState<"new" | "history">("new");
@@ -158,22 +192,114 @@ function Index() {
             </button>
           </div>
         </div>
-        {/* User Account Bar */}
-        <div className="mx-auto flex max-w-xl items-center justify-between px-4 py-1.5 text-[11px] text-muted-foreground bg-muted/40 border-t border-border/50">
-          <div className="flex items-center gap-1.5 truncate">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" aria-hidden />
-            <span>
-              Signed in as <strong className="text-foreground font-semibold">{user?.name}</strong>
-              {user?.village ? ` • ${user.village}` : ""}
-            </span>
+        {/* User Account & Switcher Bar */}
+        <div className="relative mx-auto max-w-xl bg-muted/40 border-t border-border/50">
+          <div className="flex items-center justify-between px-4 py-1.5 text-[11px] text-muted-foreground">
+            <button
+              type="button"
+              onClick={() => setShowAccountMenu(!showAccountMenu)}
+              className="flex items-center gap-1.5 truncate hover:text-foreground transition group"
+              title="Click to Switch Account"
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" aria-hidden />
+              <span className="truncate">
+                Signed in as <strong className="text-foreground font-semibold group-hover:underline">{user?.name}</strong>
+                {user?.village ? ` • ${user.village}` : ""}
+              </span>
+              <ChevronDown className="w-3 h-3 text-muted-foreground group-hover:text-foreground shrink-0 transition" />
+            </button>
+
+            <div className="flex items-center gap-2 shrink-0 ml-2">
+              <button
+                type="button"
+                onClick={() => setShowAccountMenu(!showAccountMenu)}
+                className="text-primary hover:underline font-semibold flex items-center gap-1"
+              >
+                <Users className="w-3 h-3" />
+                Switch Account
+              </button>
+              <span className="text-border">|</span>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="text-muted-foreground hover:text-destructive font-medium flex items-center gap-1 transition"
+              >
+                Log Out
+              </button>
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="text-muted-foreground hover:text-destructive font-medium flex items-center gap-1 transition shrink-0 ml-2"
-          >
-            Log Out
-          </button>
+
+          {/* Account Dropdown Menu */}
+          {showAccountMenu && (
+            <div className="absolute left-4 right-4 top-full mt-1 z-30 bg-card border border-border rounded-2xl shadow-xl p-3 space-y-2 animate-in fade-in slide-in-from-top-2 duration-150">
+              <div className="flex items-center justify-between border-b border-border pb-2 px-1">
+                <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5 text-primary" />
+                  Saved Accounts on this Device
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowAccountMenu(false)}
+                  className="text-muted-foreground hover:text-foreground text-xs"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Saved accounts list */}
+              <div className="space-y-1 max-h-48 overflow-y-auto">
+                {savedUsers.map((u) => {
+                  const isActive = u.id === user?.id || u.email.toLowerCase() === user?.email.toLowerCase();
+                  return (
+                    <div
+                      key={u.id}
+                      onClick={() => !isActive && handleSwitchAccount(u)}
+                      className={`flex items-center justify-between p-2 rounded-xl text-xs transition cursor-pointer ${
+                        isActive
+                          ? "bg-primary/10 border border-primary/30 text-primary font-semibold"
+                          : "hover:bg-accent text-foreground"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <div className="w-7 h-7 rounded-lg bg-primary/20 text-primary font-bold flex items-center justify-center text-[10px] shrink-0">
+                          {u.name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase()}
+                        </div>
+                        <div className="truncate">
+                          <div className="font-semibold truncate">{u.name}</div>
+                          <div className="text-[10px] text-muted-foreground truncate">{u.email}</div>
+                        </div>
+                      </div>
+                      {isActive && (
+                        <span className="flex items-center gap-1 text-[10px] font-bold text-primary shrink-0 ml-2">
+                          <Check className="w-3.5 h-3.5" /> Active
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="border-t border-border pt-2 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={handleUseAnotherAccount}
+                  className="flex items-center justify-center gap-1.5 p-2 rounded-xl border border-border hover:bg-accent text-xs font-semibold text-foreground transition"
+                >
+                  <LogIn className="w-3.5 h-3.5 text-primary" />
+                  Use Another Account
+                </button>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="flex items-center justify-center gap-1.5 p-2 rounded-xl border border-destructive/20 bg-destructive/5 hover:bg-destructive/10 text-xs font-semibold text-destructive transition"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  Log Out All
+                </button>
+              </div>
+            </div>
+          )}
         </div>
         <nav className="mx-auto flex max-w-xl gap-2 px-4 py-2">
           {(["new", "history"] as const).map((k) => (
