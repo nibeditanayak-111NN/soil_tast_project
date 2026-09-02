@@ -84,12 +84,7 @@ function AuthPage() {
     }
   }, []);
 
-  // If already logged in, redirect directly to dashboard unless user navigated with intent
-  useEffect(() => {
-    if (getSession()) {
-      navigate({ to: "/" });
-    }
-  }, [navigate]);
+  const currentSession = getSession();
 
   // Handle Quick Account Selection from Saved List
   const handleSelectAccount = async (user: UserProfile) => {
@@ -317,6 +312,25 @@ function AuthPage() {
               <span className="text-xs text-muted-foreground block">Farmer Intelligence Portal</span>
             </div>
           </div>
+
+          {/* Active Session Indicator if logged in */}
+          {currentSession && (
+            <div className="flex items-center justify-between p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 text-xs text-foreground">
+              <div className="flex items-center gap-2 truncate">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" aria-hidden />
+                <span className="truncate">
+                  Active session: <strong className="font-semibold text-foreground">{currentSession.name}</strong>
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate({ to: "/" })}
+                className="font-bold text-primary hover:underline shrink-0 ml-2 flex items-center gap-1"
+              >
+                Go to Analysis Dashboard →
+              </button>
+            </div>
+          )}
 
           {/* Feedback Messages */}
           {error && (
