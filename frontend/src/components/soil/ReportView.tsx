@@ -4,6 +4,7 @@ import type { Lang } from "@/lib/soil/i18n";
 import { speakReport } from "@/lib/soil/tts";
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
+import { TrendChart } from "./TrendChart";
 
 type Props = {
   report: SoilReport;
@@ -293,43 +294,14 @@ export function ReportView({ report, trend, t, lang = "en" }: Props) {
 
       {trend && (
         <Section title={`${t("longTermTrend")} — ${t(trend.direction)}`}>
-          {/* Forecast summary */}
-          <p className="text-sm text-muted-foreground">{trend.forecastSummary}</p>
-
-          {/* Predicted score timeline */}
-          {trend.predictedScore3m !== null && (
-            <div className="mt-3 grid grid-cols-3 gap-2">
-              {[
-                { label: "3 months", score: trend.predictedScore3m },
-                { label: "6 months", score: trend.predictedScore6m },
-                { label: "12 months", score: trend.predictedScore12m },
-              ].map(({ label, score }) => {
-                if (score == null) return null;
-                const color =
-                  score >= 70 ? "text-leaf" :
-                  score >= 55 ? "text-ochre" : "text-destructive";
-                return (
-                  <div key={label} className="rounded-md bg-muted p-2 text-center">
-                    <p className={`text-lg font-bold ${color}`}>{score.toFixed(0)}</p>
-                    <p className="text-[10px] text-muted-foreground">{label}</p>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Model confidence */}
-          <div className="mt-2 flex items-center justify-between text-[10px] text-muted-foreground">
-            <span>OLS R² confidence: {(trend.r2Score * 100).toFixed(0)}%</span>
-            <span>Based on {trend.dataPoints} records</span>
+          <div className="-mx-1 sm:mx-0">
+            <TrendChart
+              reports={[]}
+              trend={trend}
+              currentReport={report}
+              showNutrientsToggle={true}
+            />
           </div>
-
-          {/* Critical warning */}
-          {trend.seasonsToCritical !== null && (
-            <p className="mt-2 rounded-md bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">
-              Warning: Score may reach critical (&lt;40) in ~{trend.seasonsToCritical} season(s) without intervention.
-            </p>
-          )}
         </Section>
       )}
 

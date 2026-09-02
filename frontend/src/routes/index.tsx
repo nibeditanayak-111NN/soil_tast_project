@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { CameraCapture } from "@/components/soil/CameraCapture";
 import { SoilForm } from "@/components/soil/SoilForm";
 import { ReportView } from "@/components/soil/ReportView";
+import { TrendChart } from "@/components/soil/TrendChart";
 import { analyzeSoil, computeTrend } from "@/lib/soil/engine";
 import { classifySoilImage } from "@/lib/soil/vision";
 import { deleteReport, loadReports, saveReport } from "@/lib/soil/storage";
@@ -351,38 +352,73 @@ function Index() {
         ) : reports.length === 0 ? (
           <p className="py-10 text-center text-sm text-muted-foreground">{t("noHistory")}</p>
         ) : (
-          <ul className="space-y-3">
-            {reports.map((r) => (
-              <li key={r.id} className="rounded-xl border border-border bg-paper p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <button
-                    type="button"
-                    className="flex-1 text-left"
-                    onClick={() => {
-                      setCurrent(r);
-                      setTab("new");
-                    }}
-                  >
-                    <p className="text-sm font-semibold">
-                      {r.input.fieldName} · {r.healthScore.toFixed(1)}/100
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {t("analysis")} #{r.analysisNo} · {new Date(r.createdAt).toLocaleDateString()} ·{" "}
-                      {t(r.healthBand)}
-                    </p>
-                  </button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={t("delete")}
-                    onClick={() => setReports(deleteReport(r.id))}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <div className="space-y-4">
+            {/* Trend Chart across all analyses */}
+            <TrendChart
+              reports={reports}
+              trend={trend}
+              title="Your Soil Health Over Time"
+              showNutrientsToggle={true}
+            />
+
+            {/* Analysis History List */}
+            <ul className="space-y-3">
+              {reports.map((r) => {
+                const bandColor =
+                  r.healthBand === "excellent" ? "text-emerald-600 dark:text-emerald-400" :
+                  r.healthBand === "good" ? "text-green-600 dark:text-green-400" :
+                  r.healthBand === "fair" ? "text-amber-600 dark:text-amber-400" :
+                  "text-destructive";
+                const scoreBg =
+                  r.healthScore >= 70 ? "bg-emerald-500/10 border-emerald-500/20" :
+                  r.healthScore >= 55 ? "bg-amber-500/10 border-amber-500/20" :
+                  "bg-destructive/10 border-destructive/20";
+                return (
+                  <li key={r.id} className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
+                    <button
+                      type="button"
+                      className="w-full text-left px-4 py-3 hover:bg-accent/40 transition flex items-center gap-4"
+                      onClick={() => {
+                        setCurrent(r);
+                        setTab("new");
+                      }}
+                    >
+                      {/* Score Circle */}
+                      <div className={`shrink-0 w-12 h-12 rounded-xl border flex flex-col items-center justify-center ${scoreBg}`}>
+                        <span className={`text-base font-extrabold leading-none ${bandColor}`}>{r.healthScore.toFixed(0)}</span>
+                        <span className="text-[9px] text-muted-foreground mt-0.5">/ 100</span>
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-foreground truncate">{r.input.fieldName}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {t("analysis")} #{r.analysisNo} · {new Date(r.createdAt).toLocaleDateString()}
+                        </p>
+                        <span className={`text-[11px] font-semibold capitalize ${bandColor}`}>{t(r.healthBand)}</span>
+                      </div>
+
+                      {/* Arrow */}
+                      <span className="text-muted-foreground shrink-0 text-sm">›</span>
+                    </button>
+
+                    {/* Delete strip */}
+                    <div className="border-t border-border/50 px-4 py-1.5 flex justify-end">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label={t("delete")}
+                        onClick={() => setReports(deleteReport(r.id))}
+                        className="text-xs text-muted-foreground hover:text-destructive h-auto py-1"
+                      >
+                        <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
+                      </Button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         )}
       </main>
     </div>
