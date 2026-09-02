@@ -8,20 +8,20 @@ from pydantic import BaseModel, Field
 
 # ── Input ─────────────────────────────────────────────────────────────────────
 class SoilTestInput(BaseModel):
-    fieldName:     str   = Field(..., example="North Field")
-    village:       str   = Field(..., example="Warangal")
-    areaHa:        float = Field(..., gt=0, example=1.6)
-    nitrogen:      float = Field(..., ge=0, example=55)
-    phosphorus:    float = Field(..., ge=0, example=22)
-    potassium:     float = Field(..., ge=0, example=45)
-    ph:            float = Field(..., ge=0, le=14, example=5.9)
-    organicMatter: float = Field(..., ge=0, example=0.68)
-    moisture:      float = Field(..., ge=0, le=100, example=22)
+    fieldName:     str   = Field(..., json_schema_extra={"example": "North Field"})
+    village:       str   = Field(..., json_schema_extra={"example": "Warangal"})
+    areaHa:        float = Field(..., gt=0, json_schema_extra={"example": 1.6})
+    nitrogen:      float = Field(..., ge=0, json_schema_extra={"example": 55})
+    phosphorus:    float = Field(..., ge=0, json_schema_extra={"example": 22})
+    potassium:     float = Field(..., ge=0, json_schema_extra={"example": 45})
+    ph:            float = Field(..., ge=0, le=14, json_schema_extra={"example": 5.9})
+    organicMatter: float = Field(..., ge=0, json_schema_extra={"example": 0.68})
+    moisture:      float = Field(..., ge=0, le=100, json_schema_extra={"example": 22})
 
 
 class AnalyzeSoilRequest(BaseModel):
     soilInput:          SoilTestInput
-    soilTypePrediction: Optional[str] = Field(None, example="Red",
+    soilTypePrediction: Optional[str] = Field(None, json_schema_extra={"example": "Red"},
         description="Soil type from image ML classifier e.g. Red, Black, Alluvial")
     imageDataUrl:       Optional[str] = Field(None, description="Base64 image data from frontend")
 
