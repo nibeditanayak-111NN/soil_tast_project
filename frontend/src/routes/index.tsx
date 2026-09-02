@@ -46,9 +46,9 @@ const DEFAULT_INPUT: SoilTestInput = {
 
 function Index() {
   const navigate = useNavigate();
-  const [lang, setLang] = useState<Lang>("en");
-  const t = useMemo(() => makeT(lang), [lang]);
   const [user, setUser] = useState(getSession);
+  const [lang, setLang] = useState<Lang>(() => user?.preferredLang || "en");
+  const t = useMemo(() => makeT(lang), [lang]);
 
   // Auth guard — redirect to login if no session
   useEffect(() => {
@@ -56,13 +56,18 @@ function Index() {
   }, [user, navigate]);
 
   const handleLogout = () => {
-    clearSession();
-    setUser(null);
-    navigate({ to: "/login" });
+    if (window.confirm("Are you sure you want to log out?")) {
+      clearSession();
+      setUser(null);
+      navigate({ to: "/login" });
+    }
   };
 
   const [tab, setTab] = useState<"new" | "history">("new");
-  const [input, setInput] = useState<SoilTestInput>(DEFAULT_INPUT);
+  const [input, setInput] = useState<SoilTestInput>(() => ({
+    ...DEFAULT_INPUT,
+    village: user?.village || DEFAULT_INPUT.village,
+  }));
   const [photo, setPhoto] = useState<string | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const [reports, setReports] = useState<SoilReport[]>([]);
@@ -146,14 +151,31 @@ function Index() {
               type="button"
               onClick={handleLogout}
               title={`Logout (${user?.name})`}
-              className="ml-1 rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition"
+              className="ml-1 rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition"
               aria-label="Logout"
             >
               <LogOut className="h-4 w-4" />
             </button>
           </div>
         </div>
-        <nav className="mx-auto flex max-w-xl gap-2 px-4 pb-2">
+        {/* User Account Bar */}
+        <div className="mx-auto flex max-w-xl items-center justify-between px-4 py-1.5 text-[11px] text-muted-foreground bg-muted/40 border-t border-border/50">
+          <div className="flex items-center gap-1.5 truncate">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" aria-hidden />
+            <span>
+              Signed in as <strong className="text-foreground font-semibold">{user?.name}</strong>
+              {user?.village ? ` • ${user.village}` : ""}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="text-muted-foreground hover:text-destructive font-medium flex items-center gap-1 transition shrink-0 ml-2"
+          >
+            Log Out
+          </button>
+        </div>
+        <nav className="mx-auto flex max-w-xl gap-2 px-4 py-2">
           {(["new", "history"] as const).map((k) => (
             <button
               key={k}
